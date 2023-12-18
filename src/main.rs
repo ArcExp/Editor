@@ -32,10 +32,6 @@ struct Editor {
     error: Option<Error>,          // Error state
     theme: highlighter::Theme,     // Theme for syntax highlighting
     is_dirty: bool,                // Flag to track if content is dirty (changed)
-    history_stack_undo: Vec<String>,
-    history_stack_redo: Vec<String>,
-    current_index_undo: usize,
-    current_index_redo: usize,
 }
 
 // Define the message enum for handling editor actions
@@ -48,58 +44,6 @@ enum Message {
     Save,                                              // Save file action
     FileSaved(Result<PathBuf, Error>),                 // File saved action
     ThemeSelected(highlighter::Theme),                 // Theme selection action
-    Undo,
-    Redo,
-}
-
-impl Editor {
-    // Function to save current content state to history stack
-    fn save_to_history(&mut self, content: &str) {
-        // Remove future redo states if changes are made after an undo action
-        self.history_stack_redo.clear();
-
-        // Push a snapshot of the current content to the undo history stack
-        self.history_stack_undo.push(content.to_string());
-
-        // Move the current index pointer to the new state in the undo history
-        self.current_index_undo = self.history_stack_undo.len() - 1;
-    }
-
-    pub fn undo(&mut self) {
-        if let Some(prev_index) = self.current_index_undo.checked_sub(1) {
-            if let Some(prev_content) = self.history_stack_undo.get(prev_index).cloned() {
-                // Move content from undo stack to redo stack
-                self.history_stack_redo
-                    .push(self.history_stack_undo.pop().unwrap());
-
-                self.apply_content(&prev_content);
-                self.current_index_undo = prev_index;
-            }
-        }
-    }
-
-    pub fn redo(&mut self) {
-        if let Some(next_index) = self.current_index_redo.checked_sub(1) {
-            if let Some(next_content) = self.history_stack_redo.get(next_index).cloned() {
-                // Move content from redo stack to undo stack
-                self.history_stack_undo
-                    .push(self.history_stack_redo.pop().unwrap());
-
-                self.apply_content(&next_content);
-                self.current_index_undo = self.history_stack_undo.len() - 1;
-            }
-        }
-    }
-
-    pub fn apply_content(&mut self, content: &str) {
-        self.content = text_editor::Content::with(content);
-    }
-
-    pub fn initialize_history(&mut self, content: &str) {
-        self.history_stack_undo.push(content.to_string());
-        self.current_index_undo = 0;
-        self.current_index_redo = 0;
-    }
 }
 
 // Implement the Application trait for Editor
@@ -111,20 +55,13 @@ impl Application for Editor {
     type Flags = ();
 
     fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
-        let mut editor = Self {
+        let editor = Self {
             path: None,
             content: text_editor::Content::new(),
             error: None,
             theme: highlighter::Theme::SolarizedDark,
             is_dirty: true,
-            history_stack_undo: Vec::new(),
-            history_stack_redo: Vec::new(),
-            current_index_redo: 0,
-            current_index_undo: 0,
         };
-
-        let initial_content: String = String::new();
-        editor.initialize_history(&initial_content);
 
         let command = Command::perform(load_file(default_file()), Message::FileOpened);
         (editor, command)
@@ -143,8 +80,6 @@ impl Application for Editor {
 
                 self.content.edit(action);
 
-                let content = self.content.text().to_string();
-                self.save_to_history(&content); // Save content changes to history
                 Command::none()
             }
             Message::New => {
@@ -182,14 +117,6 @@ impl Application for Editor {
                 self.theme = theme;
                 Command::none()
             }
-            Message::Undo => {
-                self.undo();
-                Command::none()
-            }
-            Message::Redo => {
-                self.redo();
-                Command::none()
-            }
         }
     }
 
@@ -211,15 +138,13 @@ impl Application for Editor {
                 self.is_dirty.then_some(Message::Save)
             ),
             action(open_icon(), "Open file", Some(Message::Open)),
-            action(undo_icon(), "Undo", Some(Message::Undo)),
-            action(redo_icon(), "Redo", Some(Message::Redo)),
+            action(left_align_icon(), "Left", None),
+            action(center_align_icon(), "Centre", None),
+            action(right_align_icon(), "Right", None),
             action(bold_icon(), "Bold", None),
             action(italic_icon(), "Italics", None),
             action(underline_icon(), "Underline", None),
             action(bullet_icon(), "Bullet Point", None),
-            action(left_align_icon(), "Left", None),
-            action(center_align_icon(), "Centre", None),
-            action(right_align_icon(), "Right", None),
             horizontal_space(Length::Fill),
             pick_list(
                 highlighter::Theme::ALL,
