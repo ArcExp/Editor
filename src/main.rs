@@ -63,7 +63,7 @@ impl Editor {
         self.current_index = self.history_stack.len() - 1;
     }
 
-    fn undo(&mut self) {
+    pub fn undo(&mut self) {
         if let Some(prev_index) = self.current_index.checked_sub(1) {
             if let Some(prev_content) = self.history_stack.get(prev_index).cloned() {
                 self.apply_content(&prev_content);
@@ -72,7 +72,7 @@ impl Editor {
         }
     }
     
-    fn redo(&mut self) {
+    pub fn redo(&mut self) {
         if let Some(next_index) = self.current_index.checked_add(1) {
             if let Some(next_content) = self.history_stack.get(next_index).cloned() {
                 self.apply_content(&next_content);
@@ -81,11 +81,11 @@ impl Editor {
         }
     }        
 
-    fn apply_content(&mut self, content: &str) {
+    pub fn apply_content(&mut self, content: &str) {
         self.content = text_editor::Content::with(content);
     }
 
-    fn initialize_history(&mut self, content: &str) {
+    pub fn initialize_history(&mut self, content: &str) {
         self.history_stack.push(content.to_string());
         self.current_index = 0;
     }    
@@ -171,11 +171,11 @@ impl Application for Editor {
                 Command::none()
             }
             Message::Undo => {
-                self.undo(); // Call the undo function when 'Undo' is pressed
+                self.undo();
                 Command::none()
             }
             Message::Redo => {
-                self.redo(); // Call the redo function when 'Redo' is pressed
+                self.redo();
                 Command::none()
             }
         }
